@@ -25,6 +25,8 @@ namespace RigPowerMonitor
 
         static void Main(string[] args)
         {
+            showHeader();
+
             if (args == null || args.Length == 0)
             {
                 Console.WriteLine("ERROR: Required options not set. Use -h for help.");
