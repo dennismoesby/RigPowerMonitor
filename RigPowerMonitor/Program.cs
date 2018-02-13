@@ -304,9 +304,9 @@ namespace RigPowerMonitor
 
         private static void showHeader()
         {
-            Console.WriteLine("----------------------------------");
-            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.0");
-            Console.WriteLine("----------------------------------");
+            Console.WriteLine("------------------------------------------------");
+            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.01 - 2018-02-13");
+            Console.WriteLine("------------------------------------------------");
             Console.WriteLine("");
             Console.WriteLine("By Dennis Moesby. Based in part on Wemo.net API by seanksullivan (https://github.com/seanksullivan/Wemo.net)");
             Console.WriteLine("");
