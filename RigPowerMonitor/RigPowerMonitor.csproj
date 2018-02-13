@@ -61,6 +61,12 @@
   <PropertyGroup>
     <SignManifests>true</SignManifests>
   </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>RigPowerMonitor.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -79,8 +85,7 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Properties\PublishProfiles\RigPowerMonitor - Web Deploy.pubxml" />
-    <None Include="Properties\webjob-publish-settings.json" />
-    <None Include="RigPowerMonitor_TemporaryKey.pfx" />
+    <None Include="RigPowerMonitor.snk" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\WemoNet\WemoNet.csproj">

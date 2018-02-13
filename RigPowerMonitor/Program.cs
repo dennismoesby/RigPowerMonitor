@@ -13,7 +13,7 @@ namespace RigPowerMonitor
     {
         static string IpAddress;
         static int PowerConsumptionThreshold;
-        static int MinutesToWaitAfterPowerDecline;
+        static int SecondsToWaitAfterPowerDecline;
         static int SecondsToWaitBeforePoweringBackOn;
 
         static bool powerHasDroppedBelowThreshold;
@@ -25,48 +25,55 @@ namespace RigPowerMonitor
 
         static void Main(string[] args)
         {
-            showHeader();
+            try
+            {
+                showHeader();
 
-            if (args == null || args.Length == 0)
-            {
-                Console.WriteLine("ERROR: Required options not set. Use -h for help.");
-            }
-            else if (args.Any(x => x.Equals("-h", StringComparison.InvariantCultureIgnoreCase)))
-            {
-                showHelp();
-            }
-            else
-            {
-                parseArgs(args);
-
-                if (string.IsNullOrWhiteSpace(IpAddress))
-                    Console.WriteLine("ERROR: Ip address not set. Use -h for help.");
-                else if (PowerConsumptionThreshold == 0)
-                    Console.WriteLine("ERROR: Minimum power consumption threshold not set. Use -h for help.");
+                if (args == null || args.Length == 0)
+                {
+                    Console.WriteLine("ERROR: Required options not set. Use -h for help.");
+                }
+                else if (args.Any(x => x.Equals("-h", StringComparison.InvariantCultureIgnoreCase)))
+                {
+                    showHelp();
+                }
                 else
                 {
-                    if (MinutesToWaitAfterPowerDecline == 0) MinutesToWaitAfterPowerDecline = 5;
-                    if (SecondsToWaitBeforePoweringBackOn == 0) SecondsToWaitBeforePoweringBackOn = 30;
-                    ApiAddress = "http://" + IpAddress;
+                    parseArgs(args);
 
-                    try
+                    if (string.IsNullOrWhiteSpace(IpAddress))
+                        Console.WriteLine("ERROR: Ip address not set. Use -h for help.");
+                    else if (PowerConsumptionThreshold == 0)
+                        Console.WriteLine("ERROR: Minimum power consumption threshold not set. Use -h for help.");
+                    else
                     {
-                        getWemoName();
-                        Console.WriteLine($"Connected to: {WemoFriendlyName} ({IpAddress}).");
-                        Console.WriteLine($"Min. power consumption threshold: {PowerConsumptionThreshold} W.");
-                        Console.WriteLine($"Wait time before power off: {MinutesToWaitAfterPowerDecline} minutes.");
-                        Console.WriteLine($"Wait time before power back on: {SecondsToWaitBeforePoweringBackOn} seconds.");
-                        Console.WriteLine("");
+                        if (SecondsToWaitAfterPowerDecline == 0) SecondsToWaitAfterPowerDecline = 300;
+                        if (SecondsToWaitBeforePoweringBackOn == 0) SecondsToWaitBeforePoweringBackOn = 30;
+                        ApiAddress = "http://" + IpAddress;
 
-                        showDonationInfo();
-                        Monitor();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"ERROR: Can't connect to WeMo Insight Switch on ip address {IpAddress}. Error message: {ex.Message}");
-                    }
+                        try
+                        {
+                            getWemoName();
+                            Console.WriteLine($"Connected to: {WemoFriendlyName} ({IpAddress}).");
+                            Console.WriteLine($"Min. power consumption threshold: {PowerConsumptionThreshold} W.");
+                            Console.WriteLine($"Wait time before power off: {SecondsToWaitAfterPowerDecline} seconds.");
+                            Console.WriteLine($"Wait time before power back on: {SecondsToWaitBeforePoweringBackOn} seconds.");
+                            Console.WriteLine("");
 
+                            showDonationInfo();
+                            Monitor();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"ERROR: Can't connect to WeMo Insight Switch on ip address {IpAddress}. Error message: {ex.Message}");
+                        }
+
+                    }
                 }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"ERROR: {ex.Message}");
             }
         }
 
@@ -113,7 +120,7 @@ namespace RigPowerMonitor
                             {
                                 // Power consumption has previously dropped below the threshold and we're waiting for it to either go back up or for the timer to run out before powering off.
 
-                                if (insight.CurrentPowerConsumption < PowerConsumptionThreshold && timeSincePowerDroppedBelowThreshold.ElapsedMilliseconds > (MinutesToWaitAfterPowerDecline * 60 * 1000))
+                                if (insight.CurrentPowerConsumption < PowerConsumptionThreshold && timeSincePowerDroppedBelowThreshold.ElapsedMilliseconds > (SecondsToWaitAfterPowerDecline * 1000))
                                 {
                                     logMessage("Monitoring paused.");
                                     PowerOffAndOn();
@@ -125,7 +132,7 @@ namespace RigPowerMonitor
                                 }
                                 else if (insight.CurrentPowerConsumption < PowerConsumptionThreshold)
                                 {
-                                    var timeToWait = new TimeSpan(0, MinutesToWaitAfterPowerDecline, 0).Subtract(timeSincePowerDroppedBelowThreshold.Elapsed);
+                                    var timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline).Subtract(timeSincePowerDroppedBelowThreshold.Elapsed);
 
                                     msg += $"Power consumption below threshold. Powering off in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.";
                                     logMessage(msg, true);
@@ -148,7 +155,7 @@ namespace RigPowerMonitor
                                 {
                                     // power just dropped below threshold. Starting count down
 
-                                    var timeToWait = new TimeSpan(0, MinutesToWaitAfterPowerDecline, 0);
+                                    var timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline);
                                     powerHasDroppedBelowThreshold = true;
                                     timeSincePowerDroppedBelowThreshold.Start();
 
@@ -204,12 +211,12 @@ namespace RigPowerMonitor
                 logMessage($"{WemoFriendlyName} succesfully switched on.");
 
                 sw.Start();
-                timeToWait = new TimeSpan(0, MinutesToWaitAfterPowerDecline, 0);
+                timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline);
                 while (timeToWait.TotalMilliseconds > 0)
                 {
                     logMessage($"Resuming monitoring in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.", true);
                     Thread.Sleep(1000);
-                    timeToWait = new TimeSpan(0, MinutesToWaitAfterPowerDecline, 0).Subtract(sw.Elapsed);
+                    timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline).Subtract(sw.Elapsed);
                 }
             }
             catch (Exception ex)
@@ -220,62 +227,78 @@ namespace RigPowerMonitor
 
         private static void logMessage(string messsage, bool overwrite = false)
         {
-            var msg = $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} {messsage}";
-            if (!overwrite)
+            try
             {
-                if (previousLogMessageOverwrite)
-                    Console.Write("\n");
+                var msg = $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} {messsage}";
+                if (!overwrite)
+                {
+                    if (previousLogMessageOverwrite)
+                        Console.Write("\n");
 
-                Console.WriteLine(msg);
+                    Console.WriteLine(msg);
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(previousLogMessage) && msg.Length < previousLogMessage.Length)
+                        msg = msg.PadRight(previousLogMessage.Length, ' ');
+
+                    Console.Write("\r{0}", msg);
+                }
+
+                previousLogMessage = msg.Trim();
+                previousLogMessageOverwrite = overwrite;
             }
-            else
+            catch
             {
-                if (!string.IsNullOrWhiteSpace(previousLogMessage) && msg.Length < previousLogMessage.Length)
-                    msg = msg.PadRight(previousLogMessage.Length, ' ');
-
-                Console.Write("\r{0}", msg);
+                // do nothing.
             }
-
-            previousLogMessage = msg.Trim();
-            previousLogMessageOverwrite = overwrite;
         }
 
 
         private static void parseArgs(string[] args)
         {
-            int _argno = 0;
-            while (_argno < args.Length)
+            try
             {
-                if (args[_argno].Equals("-a", StringComparison.InvariantCultureIgnoreCase))
+                int _argno = 0;
+                while (_argno < args.Length)
                 {
-                    _argno++;
-                    if (_argno < args.Length)
-                        if (!args[_argno].StartsWith("-"))
-                            IpAddress = args[_argno];
-                }
-                else if (args[_argno].Equals("-p", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    _argno++;
-                    if (_argno < args.Length)
-                        if (!args[_argno].StartsWith("-"))
-                            int.TryParse(args[_argno], out PowerConsumptionThreshold);
-                }
-                else if (args[_argno].Equals("-m", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    _argno++;
-                    if (_argno < args.Length)
-                        if (!args[_argno].StartsWith("-"))
-                            int.TryParse(args[_argno], out MinutesToWaitAfterPowerDecline);
-                }
-                else if (args[_argno].Equals("-o", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    _argno++;
-                    if (_argno < args.Length)
-                        if (!args[_argno].StartsWith("-"))
-                            int.TryParse(args[_argno], out SecondsToWaitBeforePoweringBackOn);
-                }
+                    if (args[_argno].Equals("-a", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                                IpAddress = args[_argno];
+                    }
+                    else if (args[_argno].Equals("-p", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                                int.TryParse(args[_argno], out PowerConsumptionThreshold);
+                    }
+                    else if (args[_argno].Equals("-w", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                                int.TryParse(args[_argno], out SecondsToWaitAfterPowerDecline);
+                    }
+                    else if (args[_argno].Equals("-o", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                                int.TryParse(args[_argno], out SecondsToWaitBeforePoweringBackOn);
+                    }
+                    else
+                        throw new Exception($"Unknown option '{args[_argno]}'. Use -h for help.");
 
-                _argno++;
+                    _argno++;
+                }
+            }
+            catch 
+            {
+                throw;
             }
         }
 
@@ -308,7 +331,7 @@ namespace RigPowerMonitor
             Console.WriteLine("");
             Console.WriteLine("-a   Ip address of the Wemo Insight Switch to monitor. Required.");
             Console.WriteLine("-p   Power Consumption Threshold. The lowest allowed power consumption of the mining rig before powering off and back on. Required.");
-            Console.WriteLine("-m   Minutes to wait for the power consumption to go back up over the threshold again before powering off. Default: 5.");
+            Console.WriteLine("-w   Seconds to wait for the power consumption to go back up over the threshold again before powering off. Default: 300.");
             Console.WriteLine("-o   Seconds to wait before powering back on after the power has been cut. Default: 30.");
             Console.WriteLine("-h   Display this help.");
             Console.WriteLine("");
