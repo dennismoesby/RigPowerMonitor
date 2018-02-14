@@ -44,4 +44,4 @@ IP Addresses and Ports
 
 The IP address of the WeMo switch can be found via the WeMo app for your smart phone. WeMo switch uses port 49153 (TCP and UDP)
 
-The IP address of the TP-Link can be found by running RigPowerMonitor -tp. TP-Link plug uses port 9999 (TCO and UDP).
+The IP address of the TP-Link can be found by running RigPowerMonitor -tp. TP-Link plug uses port 9999 (TCP and UDP).
