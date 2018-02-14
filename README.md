@@ -16,19 +16,19 @@ Usage: RigPowerMonitor.exe [-OPTIONS]
 
 Options:
 
--t     Smart Plug Type. 0 = WeMo Insight Switch. 1 = TP-Link HS110. Default: 0.
+-t&nbsp;&nbsp;&nbsp;&nbsp;Smart Plug Type. 0 = WeMo Insight Switch. 1 = TP-Link HS110. Default: 0.
 
--a     Ip address of the smart plug to monitor. Required.
+-a&nbsp;&nbsp;&nbsp;&nbsp;Ip address of the smart plug to monitor. Required.
 
--p     Power Consumption Threshold. The lowest allowed power consumption of the mining rig before powering off and back on. Required.
+-p&nbsp;&nbsp;&nbsp;&nbsp;Power Consumption Threshold. The lowest allowed power consumption of the mining rig before powering off and back on. Required.
 
--w     Seconds to wait for the power consumption to go back up over the threshold again before powering off. Default: 300.
+-w&nbsp;&nbsp;&nbsp;&nbsp;Seconds to wait for the power consumption to go back up over the threshold again before powering off. Default: 300.
 
--o     Seconds to wait before powering back on after the power has been cut. Default: 30.
+-o&nbsp;&nbsp;&nbsp;&nbsp;Seconds to wait before powering back on after the power has been cut. Default: 30.
 
--tp    Display a list of available TP-Link devices with their corresponding IP address.
+-tp&nbsp;&nbsp;&nbsp;Display a list of available TP-Link devices with their corresponding IP address.
 
--h     Display this help.
+-h&nbsp;&nbsp;&nbsp;&nbsp;Display this help.
 
 
 This tool is provided as is. If you like it, consider donating:
