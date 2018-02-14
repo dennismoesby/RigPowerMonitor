@@ -329,7 +329,7 @@ namespace RigPowerMonitor
             Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.1 - 2018-02-14");
             Console.WriteLine("-----------------------------------------------");
             Console.WriteLine("");
-            Console.WriteLine("By Dennis Moesby. (http://https://github.com/dennismoesby/RigPowerMonitor)");
+            Console.WriteLine("By Dennis Moesby. https://github.com/dennismoesby/RigPowerMonitor");
             Console.WriteLine("WeMo API: https://github.com/seanksullivan/Wemo.net");
             Console.WriteLine("TP-Link API: https://www.codeproject.com/Tips/1169091/How-to-Control-TP-Link-Smart-Plug-HS-XX");
             Console.WriteLine("");
