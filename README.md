@@ -32,9 +32,9 @@ OPTIONS:
 
 SUPPORTED SMART PLUGS:
 
-Belkin WeMo Insight Switch
+- Belkin WeMo Insight Switch
 
-TP-Link HS 110 Smart Plug
+- TP-Link HS 110 Smart Plug
 
 IP ADRESSES AND PORTS:
 
