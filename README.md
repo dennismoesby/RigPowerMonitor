@@ -3,8 +3,10 @@
 RIG POWER CONSUMPTION MONITOR v1.1
 ----------------------------------
 
-By Dennis Moesby. 
+By Dennis Moesby.
+
 WeMo API: https://github.com/seanksullivan/Wemo.net
+
 TP-Link API: https://www.codeproject.com/Tips/1169091/How-to-Control-TP-Link-Smart-Plug-HS-XX
 
 Monitors the power consumption of a smart plug and turns it off and back on again if the power consumption drops below a specified threshold. useful to force a mining rig to reboot if it hangs. 
