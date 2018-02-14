@@ -3,9 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TPLink_SmartPlug;
 
 namespace RigPowerMonitor
 {
@@ -15,10 +18,11 @@ namespace RigPowerMonitor
         static int PowerConsumptionThreshold;
         static int SecondsToWaitAfterPowerDecline;
         static int SecondsToWaitBeforePoweringBackOn;
+        static SmartPlugs PlugType;
 
         static bool powerHasDroppedBelowThreshold;
         static Stopwatch timeSincePowerDroppedBelowThreshold;
-        static string WemoFriendlyName;
+        static string PlugFriendlyName;
         static string ApiAddress;
         static string previousLogMessage;
         static bool previousLogMessageOverwrite;
@@ -37,6 +41,10 @@ namespace RigPowerMonitor
                 {
                     showHelp();
                 }
+                else if(args.Any(x=> x.Equals("-tp", StringComparison.InvariantCultureIgnoreCase)))
+                {
+                    showTpLinkDevices();
+                }
                 else
                 {
                     parseArgs(args);
@@ -53,8 +61,9 @@ namespace RigPowerMonitor
 
                         try
                         {
-                            getWemoName();
-                            Console.WriteLine($"Connected to: {WemoFriendlyName} ({IpAddress}).");
+                            getPlugName();
+                            Console.WriteLine($"Connected to: {PlugFriendlyName} ({IpAddress}).");
+                            Console.WriteLine($"Plug type: {(PlugType == SmartPlugs.WeMoInsightSwitch ? "Belkin WeMo Insight Switch" : "TP-Link HS110")}");
                             Console.WriteLine($"Min. power consumption threshold: {PowerConsumptionThreshold} W.");
                             Console.WriteLine($"Wait time before power off: {SecondsToWaitAfterPowerDecline} seconds.");
                             Console.WriteLine($"Wait time before power back on: {SecondsToWaitBeforePoweringBackOn} seconds.");
@@ -77,20 +86,18 @@ namespace RigPowerMonitor
             }
         }
 
-        private static void getWemoName()
+        private static void getPlugName()
         {
             try
             {
-                var v = new WemoNet.Wemo();
-                var result = v.GetWemoResponseObjectAsync<GetFriendlyNameResponse>(Communications.Utilities.Soap.WemoGetCommands.GetFriendlyName, ApiAddress).GetAwaiter().GetResult();
-                WemoFriendlyName = result.FriendlyName;
+                var pHander = new SmartPlugHandler(PlugType, IpAddress);
+                PlugFriendlyName = pHander.Name;
             }
             catch
             {
                 throw;
             }
         }
-
 
         private static void Monitor()
         {
@@ -101,26 +108,29 @@ namespace RigPowerMonitor
 
                 do
                 {
-                    var v = new WemoNet.Wemo();
-                    var insight = v.GetInsightParams(ApiAddress).GetAwaiter().GetResult();
-                    if (insight == null)
-                        logMessage("No data retrieved from WeMo Insight Switch");
+                    var pHandler = new SmartPlugHandler(PlugType, IpAddress);
+                    var plugState = pHandler.GetState();
+
+                    if (plugState == SmartPlugState.unknown)
+                        logMessage("Could not determine the state of the smart plug.");
                     else
                     {
-                        if (insight.State == 0)
+                        if (plugState == SmartPlugState.off)
                         {
-                            logMessage($"{WemoFriendlyName} is OFF.");
+                            logMessage($"{PlugFriendlyName} is OFF.");
                             break;
                         }
                         else
                         {
-                            var msg = $"Power: {Math.Round(insight.CurrentPowerConsumption, 0, MidpointRounding.AwayFromZero)} W. ";
+                            var plugPower = pHandler.GetCurrentPowerConsumption();
+
+                            var msg = $"Power: {Math.Round(plugPower, 0, MidpointRounding.AwayFromZero)} W. ";
 
                             if (powerHasDroppedBelowThreshold)
                             {
                                 // Power consumption has previously dropped below the threshold and we're waiting for it to either go back up or for the timer to run out before powering off.
 
-                                if (insight.CurrentPowerConsumption < PowerConsumptionThreshold && timeSincePowerDroppedBelowThreshold.ElapsedMilliseconds > (SecondsToWaitAfterPowerDecline * 1000))
+                                if (plugPower < PowerConsumptionThreshold && timeSincePowerDroppedBelowThreshold.ElapsedMilliseconds > (SecondsToWaitAfterPowerDecline * 1000))
                                 {
                                     logMessage("Monitoring paused.");
                                     PowerOffAndOn();
@@ -130,7 +140,7 @@ namespace RigPowerMonitor
                                     timeSincePowerDroppedBelowThreshold.Reset();
                                     powerHasDroppedBelowThreshold = false;
                                 }
-                                else if (insight.CurrentPowerConsumption < PowerConsumptionThreshold)
+                                else if (plugPower < PowerConsumptionThreshold)
                                 {
                                     var timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline).Subtract(timeSincePowerDroppedBelowThreshold.Elapsed);
 
@@ -151,7 +161,7 @@ namespace RigPowerMonitor
                             {
                                 // Power consumption has not dropped below threshold. Normal monitoring...
 
-                                if (insight.CurrentPowerConsumption < PowerConsumptionThreshold)
+                                if (plugPower < PowerConsumptionThreshold)
                                 {
                                     // power just dropped below threshold. Starting count down
 
@@ -188,10 +198,10 @@ namespace RigPowerMonitor
             {
                 logMessage("Powering off.");
 
-                var v = new WemoNet.Wemo();
-                var result = v.TurnOffWemoPlugAsync(ApiAddress).GetAwaiter().GetResult();
+                var pHandler = new SmartPlugHandler(PlugType, IpAddress);
+                var result = pHandler.SetPlugState(SmartPlugState.off);
 
-                logMessage($"{WemoFriendlyName} succesfully switched off.");
+                logMessage($"{PlugFriendlyName} succesfully switched off.");
 
                 var sw = new Stopwatch();
                 sw.Start();
@@ -207,8 +217,8 @@ namespace RigPowerMonitor
                 sw.Reset();
 
                 logMessage("Powering on.");
-                result = v.TurnOnWemoPlugAsync(ApiAddress).GetAwaiter().GetResult();
-                logMessage($"{WemoFriendlyName} succesfully switched on.");
+                result = pHandler.SetPlugState(SmartPlugState.on);
+                logMessage($"{PlugFriendlyName} succesfully switched on.");
 
                 sw.Start();
                 timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline);
@@ -290,6 +300,17 @@ namespace RigPowerMonitor
                             if (!args[_argno].StartsWith("-"))
                                 int.TryParse(args[_argno], out SecondsToWaitBeforePoweringBackOn);
                     }
+                    else if (args[_argno].Equals("-t", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                            {
+                                int _plugtype = 0;
+                                int.TryParse(args[_argno], out _plugtype);
+                                PlugType = (SmartPlugs)_plugtype;
+                            }
+                    }
                     else
                         throw new Exception($"Unknown option '{args[_argno]}'. Use -h for help.");
 
@@ -321,7 +342,7 @@ namespace RigPowerMonitor
 
         private static void showHelp()
         {
-            Console.WriteLine("Monitors the power consumption of a Belkin WeMo Insight Switch and turns it off and back on again");
+            Console.WriteLine("Monitors the power consumption of a smart plug and turns it off and back on again");
             Console.WriteLine("if the power consumption drops below a specified threshold. useful to force a mining rig to reboot if it hangs.");
             Console.WriteLine("Remember to set bios on the miner to automatically boot after a power failure.");
             Console.WriteLine("");
@@ -329,14 +350,38 @@ namespace RigPowerMonitor
             Console.WriteLine("");
             Console.WriteLine("Options:");
             Console.WriteLine("");
-            Console.WriteLine("-a   Ip address of the Wemo Insight Switch to monitor. Required.");
+            Console.WriteLine("-t   Smart Plug Type. 0 = WeMo Insight Switch. 1 = TP-Link HS110. Default: 0.");
+            Console.WriteLine("-a   Ip address of the smart plug to monitor. Required.");
             Console.WriteLine("-p   Power Consumption Threshold. The lowest allowed power consumption of the mining rig before powering off and back on. Required.");
             Console.WriteLine("-w   Seconds to wait for the power consumption to go back up over the threshold again before powering off. Default: 300.");
             Console.WriteLine("-o   Seconds to wait before powering back on after the power has been cut. Default: 30.");
+            Console.WriteLine("-tp  Display a list of available TP-Link devices with their corresponding IP address.");
             Console.WriteLine("-h   Display this help.");
             Console.WriteLine("");
 
             showDonationInfo();
+        }
+
+        private static void showTpLinkDevices()
+        {
+            try
+            {
+                Console.WriteLine("Available TP-Link Devices");
+                Console.WriteLine("");
+                Console.WriteLine("IPv4 address    Name");
+                Console.WriteLine("--------------------------------------------------------------------------------------");
+
+                foreach (NetworkInterfaceType ntype in Enum.GetValues(typeof(NetworkInterfaceType)))
+                    foreach (KeyValuePair<IPAddress, DeviceInfo> dev_info in HS1XX.GetAllDevices_UDP_Broadcast(ntype, 2000))
+                        Console.WriteLine($"{dev_info.Key.ToString().PadRight(15,' ')} {dev_info.Value.Alias}");
+
+                Console.WriteLine("");
+                showDonationInfo();
+            }
+            catch
+            {
+                throw;
+            }
         }
     }
 }
