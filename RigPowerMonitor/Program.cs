@@ -101,7 +101,9 @@ namespace RigPowerMonitor
             {
                 foreach (var item in e.Entries)
                 {
-                    var msg = $"{item.CreatedOn.ToShortDateString()} {item.CreatedOn.ToShortTimeString()}: {item.Message}";
+                    var dt = item.CreatedOn.Kind == DateTimeKind.Utc ? item.CreatedOn.ToLocalTime() : item.CreatedOn;
+
+                    var msg = $"{item.CreatedOn.ToShortDateString()} {item.CreatedOn.ToLongTimeString()}: {item.Message}";
 
                     if (e.OutputOnNewLine)
                     {
@@ -230,9 +232,9 @@ namespace RigPowerMonitor
 
         private static void showHeader()
         {
-            Console.WriteLine("-----------------------------------------------");
-            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.2 - 2018-02-18");
-            Console.WriteLine("-----------------------------------------------");
+            Console.WriteLine("------------------------------------------------");
+            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.21 - 2018-02-18");
+            Console.WriteLine("------------------------------------------------");
             Console.WriteLine("");
             Console.WriteLine("By Dennis Moesby. https://github.com/dennismoesby/RigPowerMonitor");
             Console.WriteLine("WeMo API: https://github.com/seanksullivan/Wemo.net");
