@@ -26,6 +26,12 @@ OPTIONS:
 
 -o&nbsp;&nbsp;&nbsp;&nbsp;Seconds to wait before powering back on after the power has been cut. Default: 30.
 
+-l&nbsp;&nbsp;&nbsp;&nbsp;File logging level. 0 = Log everything. 1 = Log warnings and errors. 2 = Log only errors. -1 = Turn off logging. Default: 1.
+
+-tb-key&nbsp;&nbsp;&nbsp;&nbsp;textbelt.com API key. To get a text message when plug is powered off and back on. Visit www.textbelt.com to generate key and fund account. Requires -tb-num option also.
+
+-tb-num&nbsp;&nbsp;&nbsp;&nbsp;Mobile phone number to send text message to when plug is powered off and back on. Use international format including +<country code>, i.e. +4512345678 for Denmark or +1123456789 for USA. Requires -tb-key option also.
+  
 -tp&nbsp;&nbsp;&nbsp;Display a list of available TP-Link devices with their corresponding IP address.
 
 -h&nbsp;&nbsp;&nbsp;&nbsp;Display this help.
