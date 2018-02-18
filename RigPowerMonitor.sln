@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WemoNet", "WemoNet\WemoNet.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TPLink_SmartPlug", "TPLink_SmartPlug\TPLink_SmartPlug.csproj", "{66BD4293-FC66-4A3C-85A2-6AF35CD67FAF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RigPowerMonitor.Api", "RigPowerMonitor.Api\RigPowerMonitor.Api.csproj", "{DA5A9A96-95C7-460C-BDF4-4761115BB11A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{66BD4293-FC66-4A3C-85A2-6AF35CD67FAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{66BD4293-FC66-4A3C-85A2-6AF35CD67FAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{66BD4293-FC66-4A3C-85A2-6AF35CD67FAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA5A9A96-95C7-460C-BDF4-4761115BB11A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA5A9A96-95C7-460C-BDF4-4761115BB11A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA5A9A96-95C7-460C-BDF4-4761115BB11A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA5A9A96-95C7-460C-BDF4-4761115BB11A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,6 @@
 ﻿using Communications.Responses;
+using RigPowerMonitor.Api;
+using RigPowerMonitor.Api.Handlers;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -14,16 +16,7 @@ namespace RigPowerMonitor
 {
     class Program
     {
-        static string IpAddress;
-        static int PowerConsumptionThreshold;
-        static int SecondsToWaitAfterPowerDecline;
-        static int SecondsToWaitBeforePoweringBackOn;
-        static SmartPlugs PlugType;
-
-        static bool powerHasDroppedBelowThreshold;
-        static Stopwatch timeSincePowerDroppedBelowThreshold;
-        static string PlugFriendlyName;
-        static string ApiAddress;
+        static Api.ObjectModel.RpmMonitorSettings Settings;
         static string previousLogMessage;
         static bool previousLogMessageOverwrite;
 
@@ -31,6 +24,11 @@ namespace RigPowerMonitor
         {
             try
             {
+                //args = new string[] { "-a", "192.168.1.118", "-t", "0", "-p", "700", "-w", "10", "-o", "10", "-l", "-1" };
+                //args = new string[] { "-tp" };
+
+                Settings = new Api.ObjectModel.RpmMonitorSettings();
+
                 showHeader();
 
                 if (args == null || args.Length == 0)
@@ -41,7 +39,7 @@ namespace RigPowerMonitor
                 {
                     showHelp();
                 }
-                else if(args.Any(x=> x.Equals("-tp", StringComparison.InvariantCultureIgnoreCase)))
+                else if (args.Any(x => x.Equals("-tp", StringComparison.InvariantCultureIgnoreCase)))
                 {
                     showTpLinkDevices();
                 }
@@ -49,221 +47,84 @@ namespace RigPowerMonitor
                 {
                     parseArgs(args);
 
-                    if (string.IsNullOrWhiteSpace(IpAddress))
+                    if (string.IsNullOrWhiteSpace(Settings.IpAddress))
                         Console.WriteLine("ERROR: Ip address not set. Use -h for help.");
-                    else if (PowerConsumptionThreshold == 0)
+                    else if (Settings.PowerConsumptionThreshold == 0)
                         Console.WriteLine("ERROR: Minimum power consumption threshold not set. Use -h for help.");
+                    else if (!string.IsNullOrWhiteSpace(Settings.TextbeltApiKey) && string.IsNullOrWhiteSpace(Settings.MobileNumber))
+                        Console.WriteLine("ERROR: Textbelt API key set, but mobile number is not set. Use -h for help.");
+                    else if (string.IsNullOrWhiteSpace(Settings.TextbeltApiKey) && !string.IsNullOrWhiteSpace(Settings.MobileNumber))
+                        Console.WriteLine("ERROR: Mobile number is set, but Textbelt API key is not set. Use -h for help.");
                     else
                     {
-                        if (SecondsToWaitAfterPowerDecline == 0) SecondsToWaitAfterPowerDecline = 300;
-                        if (SecondsToWaitBeforePoweringBackOn == 0) SecondsToWaitBeforePoweringBackOn = 30;
-                        ApiAddress = "http://" + IpAddress;
+                        showDonationInfo();
 
-                        try
+                        using (var monitor = new MonitorHandler(Settings))
                         {
-                            getPlugName();
-                            Console.WriteLine($"Connected to: {PlugFriendlyName} ({IpAddress}).");
-                            Console.WriteLine($"Plug type: {(PlugType == SmartPlugs.WeMoInsightSwitch ? "Belkin WeMo Insight Switch" : "TP-Link HS110")}");
-                            Console.WriteLine($"Min. power consumption threshold: {PowerConsumptionThreshold} W.");
-                            Console.WriteLine($"Wait time before power off: {SecondsToWaitAfterPowerDecline} seconds.");
-                            Console.WriteLine($"Wait time before power back on: {SecondsToWaitBeforePoweringBackOn} seconds.");
-                            Console.WriteLine("");
+                            monitor.OnLogEntriesAdded += Monitor_OnLogEntriesAdded;
+                            monitor.OnLogOperationFailed += Monitor_OnLogOperationFailed;
+                            monitor.OnSmartPlugPoweredOffAndOn += Monitor_OnSmartPlugPoweredOffAndOn;
 
-                            showDonationInfo();
-                            Monitor();
+                            monitor.Monitor();
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"ERROR: Can't connect to WeMo Insight Switch on ip address {IpAddress}. Error message: {ex.Message}");
-                        }
-
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Console.WriteLine($"ERROR: {ex.Message}");
             }
         }
 
-        private static void getPlugName()
+        private static void Monitor_OnSmartPlugPoweredOffAndOn(object sender, Api.Events.SmartPlugPoweredOffAndOnEventArgs e)
         {
-            try
-            {
-                var pHander = new SmartPlugHandler(PlugType, IpAddress);
-                PlugFriendlyName = pHander.Name;
-            }
-            catch
-            {
-                throw;
-            }
         }
 
-        private static void Monitor()
+        private static void Monitor_OnLogOperationFailed(object sender, Api.Events.LogHandlerOperationFailedEventArgs e)
         {
             try
             {
-                logMessage("Monitoring started.");
-                timeSincePowerDroppedBelowThreshold = new Stopwatch();
+                var msg = $"Log handler failed. Operation: {e.Operation}. Error: {e?.Message}";
+                Console.WriteLine(msg);
+                if (previousLogMessageOverwrite)
+                    Console.Write("\n");
 
-                do
+                previousLogMessageOverwrite = false;
+                previousLogMessage = msg;
+            }
+            catch { }
+        }
+
+        private static void Monitor_OnLogEntriesAdded(object sender, Api.Events.LogEntriesAddedEventArgs e)
+        {
+            try
+            {
+                foreach (var item in e.Entries)
                 {
-                    var pHandler = new SmartPlugHandler(PlugType, IpAddress);
-                    var plugState = pHandler.GetState();
+                    var msg = $"{item.CreatedOn.ToShortDateString()} {item.CreatedOn.ToShortTimeString()}: {item.Message}";
 
-                    if (plugState == SmartPlugState.unknown)
-                        logMessage("Could not determine the state of the smart plug.");
+                    if (e.OutputOnNewLine)
+                    {
+                        if (previousLogMessageOverwrite)
+                            Console.Write("\n");
+
+                        Console.WriteLine(msg);
+                    }
                     else
                     {
-                        if (plugState == SmartPlugState.off)
-                        {
-                            logMessage($"{PlugFriendlyName} is OFF.");
-                            break;
-                        }
-                        else
-                        {
-                            var plugPower = pHandler.GetCurrentPowerConsumption();
+                        if (!string.IsNullOrWhiteSpace(previousLogMessage) && msg.Length < previousLogMessage.Length)
+                            msg = msg.PadRight(previousLogMessage.Length, ' ');
 
-                            var msg = $"Power: {Math.Round(plugPower, 0, MidpointRounding.AwayFromZero)} W. ";
-
-                            if (powerHasDroppedBelowThreshold)
-                            {
-                                // Power consumption has previously dropped below the threshold and we're waiting for it to either go back up or for the timer to run out before powering off.
-
-                                if (plugPower < PowerConsumptionThreshold && timeSincePowerDroppedBelowThreshold.ElapsedMilliseconds > (SecondsToWaitAfterPowerDecline * 1000))
-                                {
-                                    logMessage("Monitoring paused.");
-                                    PowerOffAndOn();
-                                    logMessage("Monitoring resumed.");
-
-                                    timeSincePowerDroppedBelowThreshold.Stop();
-                                    timeSincePowerDroppedBelowThreshold.Reset();
-                                    powerHasDroppedBelowThreshold = false;
-                                }
-                                else if (plugPower < PowerConsumptionThreshold)
-                                {
-                                    var timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline).Subtract(timeSincePowerDroppedBelowThreshold.Elapsed);
-
-                                    msg += $"Power consumption below threshold. Powering off in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.";
-                                    logMessage(msg, true);
-                                }
-                                else
-                                {
-                                    powerHasDroppedBelowThreshold = false;
-                                    timeSincePowerDroppedBelowThreshold.Stop();
-                                    timeSincePowerDroppedBelowThreshold.Reset();
-
-                                    msg += $"Power consumption is back up over threshold. Powering off cancelled.";
-                                    logMessage(msg);
-                                }
-                            }
-                            else
-                            {
-                                // Power consumption has not dropped below threshold. Normal monitoring...
-
-                                if (plugPower < PowerConsumptionThreshold)
-                                {
-                                    // power just dropped below threshold. Starting count down
-
-                                    var timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline);
-                                    powerHasDroppedBelowThreshold = true;
-                                    timeSincePowerDroppedBelowThreshold.Start();
-
-                                    msg += $"Power consumption below threshold. Powering off in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.";
-                                    logMessage(msg, true);
-                                }
-                                else
-                                {
-                                    logMessage(msg, true);
-                                }
-                            }
-                        }
+                        Console.Write("\r{0}", msg);
                     }
 
-                    Thread.Sleep(1000);
+                    previousLogMessage = msg.Trim();
+                }
+                previousLogMessageOverwrite = !e.OutputOnNewLine;
 
-                } while (true);
             }
-            catch (Exception ex)
-            {
-                logMessage($"ERROR: {ex.Message}");
-            }
-
-            logMessage("Monitoring stopped.");
+            catch { }
         }
-
-        private static void PowerOffAndOn()
-        {
-            try
-            {
-                logMessage("Powering off.");
-
-                var pHandler = new SmartPlugHandler(PlugType, IpAddress);
-                var result = pHandler.SetPlugState(SmartPlugState.off);
-
-                logMessage($"{PlugFriendlyName} succesfully switched off.");
-
-                var sw = new Stopwatch();
-                sw.Start();
-                var timeToWait = new TimeSpan(0, 0, SecondsToWaitBeforePoweringBackOn);
-
-                while (timeToWait.TotalMilliseconds > 0)
-                {
-                    logMessage($"Powering back on in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.", true);
-                    Thread.Sleep(1000);
-                    timeToWait = new TimeSpan(0, 0, SecondsToWaitBeforePoweringBackOn).Subtract(sw.Elapsed);
-                }
-                sw.Stop();
-                sw.Reset();
-
-                logMessage("Powering on.");
-                result = pHandler.SetPlugState(SmartPlugState.on);
-                logMessage($"{PlugFriendlyName} succesfully switched on.");
-
-                sw.Start();
-                timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline);
-                while (timeToWait.TotalMilliseconds > 0)
-                {
-                    logMessage($"Resuming monitoring in {timeToWait.Minutes}:{timeToWait.Seconds.ToString().PadLeft(2, '0')}.", true);
-                    Thread.Sleep(1000);
-                    timeToWait = new TimeSpan(0, 0, SecondsToWaitAfterPowerDecline).Subtract(sw.Elapsed);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"ERROR: Exception during Power Off and On. Message: {ex.Message}");
-            }
-        }
-
-        private static void logMessage(string messsage, bool overwrite = false)
-        {
-            try
-            {
-                var msg = $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")} {messsage}";
-                if (!overwrite)
-                {
-                    if (previousLogMessageOverwrite)
-                        Console.Write("\n");
-
-                    Console.WriteLine(msg);
-                }
-                else
-                {
-                    if (!string.IsNullOrWhiteSpace(previousLogMessage) && msg.Length < previousLogMessage.Length)
-                        msg = msg.PadRight(previousLogMessage.Length, ' ');
-
-                    Console.Write("\r{0}", msg);
-                }
-
-                previousLogMessage = msg.Trim();
-                previousLogMessageOverwrite = overwrite;
-            }
-            catch
-            {
-                // do nothing.
-            }
-        }
-
 
         private static void parseArgs(string[] args)
         {
@@ -277,28 +138,40 @@ namespace RigPowerMonitor
                         _argno++;
                         if (_argno < args.Length)
                             if (!args[_argno].StartsWith("-"))
-                                IpAddress = args[_argno];
+                                Settings.IpAddress = args[_argno];
                     }
                     else if (args[_argno].Equals("-p", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _argno++;
                         if (_argno < args.Length)
                             if (!args[_argno].StartsWith("-"))
-                                int.TryParse(args[_argno], out PowerConsumptionThreshold);
+                            {
+                                int _pVal = 0;
+                                int.TryParse(args[_argno], out _pVal);
+                                Settings.PowerConsumptionThreshold = _pVal;
+                            }
                     }
                     else if (args[_argno].Equals("-w", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _argno++;
                         if (_argno < args.Length)
                             if (!args[_argno].StartsWith("-"))
-                                int.TryParse(args[_argno], out SecondsToWaitAfterPowerDecline);
+                            {
+                                int _wVal = 0;
+                                int.TryParse(args[_argno], out _wVal);
+                                Settings.SecondsToWaitAfterPowerDecline = _wVal;
+                            }
                     }
                     else if (args[_argno].Equals("-o", StringComparison.InvariantCultureIgnoreCase))
                     {
                         _argno++;
                         if (_argno < args.Length)
                             if (!args[_argno].StartsWith("-"))
-                                int.TryParse(args[_argno], out SecondsToWaitBeforePoweringBackOn);
+                            {
+                                int _oVal = 0;
+                                int.TryParse(args[_argno], out _oVal);
+                                Settings.SecondsToWaitBeforePoweringBackOn = _oVal;
+                            }
                     }
                     else if (args[_argno].Equals("-t", StringComparison.InvariantCultureIgnoreCase))
                     {
@@ -308,7 +181,39 @@ namespace RigPowerMonitor
                             {
                                 int _plugtype = 0;
                                 int.TryParse(args[_argno], out _plugtype);
-                                PlugType = (SmartPlugs)_plugtype;
+                                Settings.PlugType = (RpmSmartPlugs)_plugtype;
+                            }
+                    }
+                    else if (args[_argno].Equals("-l", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                        {
+                            int _logginglevel = 0;
+                            int.TryParse(args[_argno], out _logginglevel);
+                            if (_logginglevel == -1)
+                                Settings.DoNotSaveLog = true;
+                            else
+                                Settings.LoggingLevel = (RpmLoggingLevel)_logginglevel;
+                        }
+                    }
+                    else if (args[_argno].Equals("-tb-key", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                                Settings.TextbeltApiKey = args[_argno];
+                    }
+                    else if (args[_argno].Equals("-tb-num", StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        _argno++;
+                        if (_argno < args.Length)
+                            if (!args[_argno].StartsWith("-"))
+                            {
+                                if (!args[_argno].StartsWith("+", StringComparison.InvariantCultureIgnoreCase))
+                                    throw new Exception("-tb-num invalid value. Use -h for help.");
+
+                                Settings.MobileNumber = args[_argno];
                             }
                     }
                     else
@@ -317,7 +222,7 @@ namespace RigPowerMonitor
                     _argno++;
                 }
             }
-            catch 
+            catch
             {
                 throw;
             }
@@ -326,7 +231,7 @@ namespace RigPowerMonitor
         private static void showHeader()
         {
             Console.WriteLine("-----------------------------------------------");
-            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.1 - 2018-02-14");
+            Console.WriteLine("RIG POWER CONSUMPTION MONITOR v1.2 - 2018-02-18");
             Console.WriteLine("-----------------------------------------------");
             Console.WriteLine("");
             Console.WriteLine("By Dennis Moesby. https://github.com/dennismoesby/RigPowerMonitor");
@@ -357,8 +262,13 @@ namespace RigPowerMonitor
             Console.WriteLine("-p   Power Consumption Threshold. The lowest allowed power consumption of the mining rig before powering off and back on. Required.");
             Console.WriteLine("-w   Seconds to wait for the power consumption to go back up over the threshold again before powering off. Default: 300.");
             Console.WriteLine("-o   Seconds to wait before powering back on after the power has been cut. Default: 30.");
+            Console.WriteLine("-l   File logging level. 0 = Log everything. 1 = Log warnings and errors. 2 = Log only errors. -1 = Turn off logging. Default: 1.");
+            Console.WriteLine("-tb-key   textbelt.com API key. To get a text message when plug is powered off and back on. Visit www.textbelt.com to generate key and fund account. Requires -tb-num option also.");
+            Console.WriteLine("-tb-num   Mobile phone number to send text message to when plug is powered off and back on. Use international format including +<country code>, i.e. +4512345678 for Denmark or +1123456789 for USA. Requires -tb-key option also.");
             Console.WriteLine("-tp  Display a list of available TP-Link devices with their corresponding IP address.");
             Console.WriteLine("-h   Display this help.");
+            Console.WriteLine("");
+            Console.WriteLine("While Rig Power Monitor is running, press 'q' to quit.");
             Console.WriteLine("");
 
             showDonationInfo();
@@ -375,7 +285,7 @@ namespace RigPowerMonitor
 
                 foreach (NetworkInterfaceType ntype in Enum.GetValues(typeof(NetworkInterfaceType)))
                     foreach (KeyValuePair<IPAddress, DeviceInfo> dev_info in HS1XX.GetAllDevices_UDP_Broadcast(ntype, 2000))
-                        Console.WriteLine($"{dev_info.Key.ToString().PadRight(15,' ')} {dev_info.Value.Alias}");
+                        Console.WriteLine($"{dev_info.Key.ToString().PadRight(15, ' ')} {dev_info.Value.Alias}");
 
                 Console.WriteLine("");
                 showDonationInfo();
