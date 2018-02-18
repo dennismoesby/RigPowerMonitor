@@ -14,7 +14,7 @@ Remember to set bios on the miner to automatically boot after a power failure.
 
 Usage: RigPowerMonitor.exe [-OPTIONS]
 
-Options:
+OPTIONS:
 
 -t&nbsp;&nbsp;&nbsp;&nbsp;Smart Plug Type. 0 = WeMo Insight Switch. 1 = TP-Link HS110. Default: 0.
 
@@ -30,8 +30,20 @@ Options:
 
 -h&nbsp;&nbsp;&nbsp;&nbsp;Display this help.
 
+SUPPORTED SMART PLUGS:
 
-This tool is provided as is. If you like it, consider donating:
+- Belkin WeMo Insight Switch
+
+- TP-Link HS 110 Smart Plug
+
+IP ADRESSES AND PORTS:
+
+The IP address of the WeMo switch can be found via the WeMo app for your smart phone. WeMo switch uses port 49153 (TCP and UDP)
+
+The IP address of the TP-Link can be found by running RigPowerMonitor -tp. TP-Link plug uses port 9999 (TCP and UDP).
+
+DISCLAIMER AND DONATION:
+
+This tool is provided as is with no guarantees or warranties. If you chose to use it, it's at your own responsibility. If you like it, consider donating:
 BTC (3Lm6h9Zb5R8ov6yZwoPnbDd4apGw9itqpD) or ETH (0x0CC2b5257BC86D5D744fb93c681A1aBa0fFc8d4E)
-
 
